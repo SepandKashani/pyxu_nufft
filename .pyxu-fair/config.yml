@@ -1,0 +1,8 @@
+# You may use this file to customize how your plugin page appears
+# on the Pyxu-FAIR: https://pyxu-org.github.io/fair/index.html
+
+# Please note that this file should only be used IN ADDITION to entering
+# metadata fields (such as summary, description, authors, and various URLS)
+# in your standard python package metadata (e.g. setup.cfg, setup.py, or
+# pyproject.toml), when you would like those fields to be displayed
+# differently on the Pyxu-FAIR than in the Pyxu application.

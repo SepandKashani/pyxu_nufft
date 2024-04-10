@@ -1,0 +1,19 @@
+# Guidelines -- https://www.sphinx-doc.org/en/master/usage/configuration.html#confval-nitpick_ignore_regex
+# See also -- ./conf.py:load_nitpick_ignore()
+
+# Broken CPython references
+py:class module
+
+# Sphinx does not understand sub-scripted containers
+py:class list\[.+\]
+py:class tuple\[.+\]
+
+# numpy.typing-related
+py:class numpy\._typing\._dtype_like\._DTypeDict
+py:class numpy\._typing\._dtype_like\._SupportsDType
+
+# Pyxu-related ====================================================================================
+# pyxu.info.ptype: special type-checker aliases.
+# [Not understood by Sphinx: for type-checkers only.]
+py:class pxs.Solver
+py:class pxs.SolverMode
