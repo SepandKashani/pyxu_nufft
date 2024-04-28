@@ -1,0 +1,42 @@
+doc/
+    Add example tutorial notebook.
+
+pyxu.math.cluster
+    Add GPU support.
+
+pyxu.math.kernel
+    Add GPU support.
+
+pyxu.operator.UniformSpread
+    Add GPU support
+        Prerequisites
+            pyxu.math.cluster fully GPU-compliant
+        apply
+        adjoint
+    Add DASK support
+
+pyxu.operator.linop.fft.nufft
+    Add GPU support
+        Prerequisites
+            pyxu.math.cluster fully GPU compliant
+            pyxu.operator.UniformSpread fully GPU compliant
+        NUFFT3: needs updates below to process CuPy arrays.
+            _partition_domain()
+            _init_metadata()
+    Add DASK support (type-1/2)
+
+Known Issues: Cause Known (& Fixable?)
+    [OK] DASK-case: Fixture[_op_asarray, width=DOUBLE] does not denote the true ground-truth due to DASK-based FFT()
+         error accumulation.  Not really a problem because errors are in 1e-7 range, but did not look into how to fix
+         them yet.
+        TestFFS::test_value_asarray
+    [OK] DASK-case: fails because generated test data does not match chunking structure of (`op._x`, `op._v`).
+         These tests were not designed with chunk-size restrictions in mind. Can probably make then chunk-aware,
+         but not a priority at the moment.
+         We note that these tests work on NUMPY inputs, so the operators are correct.
+        TestNUFFT3::test_math_adjoint
+        TestNUFFT3::test_math_gram
+        TestNUFFT3::test_math_lipschitz
+        TestNUFFT3::test_math2_lipschitz
+        TestNUFFT3::test_math3_lipschitz
+        TestNUFFT3::test_value1D_svdvals
