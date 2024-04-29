@@ -1,0 +1,77 @@
+# This is a template file used by `_kernel.py`.
+# Dollar-enclosed variables are replaced at runtime.
+
+import ctypes
+
+import numba as nb
+import numba.extending as nbe
+import numba.types as nbt
+import numpy as np
+
+nb_flags = dict(
+    nopython=True,
+    nogil=True,
+    cache=False,  # _i0() depends on ctypes pointers
+    forceobj=False,
+    parallel=False,
+    error_model="numpy",
+    fastmath=True,
+    locals={},
+    boundscheck=False,
+)
+
+
+# Expose Cython function `scipy.special.cython_special.i0()` to Numba.
+_i0_ptr = nbe.get_cython_function_address("scipy.special.cython_special", "i0")
+_i0_sig = ctypes.CFUNCTYPE(ctypes.c_double, ctypes.c_double)  # only signature understood by i0()
+_i0 = _i0_sig(_i0_ptr)
+
+
+@nb.jit(
+    [
+        nbt.float32(nbt.float32),
+        nbt.float64(nbt.float64),
+    ],
+    **nb_flags,
+)
+def i0(x):
+    dtype = type(x)
+    y = _i0(x)
+    return dtype(y)
+
+
+@nb.jit(
+    [
+        nbt.float32(nbt.float32),
+        nbt.float64(nbt.float64),
+    ],
+    **nb_flags,
+)
+def apply(x):
+    dtype = type(x)
+    mask = dtype(abs(x) <= ${support})
+
+    _x = np.sqrt(1 - (x * mask / ${support}) ** 2)
+    y = i0(${beta} * _x) * (mask / ${i0_beta})
+
+    return y
+
+
+@nb.jit(
+    [
+        nbt.float32(nbt.float32),
+        nbt.float64(nbt.float64),
+    ],
+    **nb_flags,
+)
+def applyF(v):
+    a = (${beta}) ** 2 - (2 * np.pi * ${support} * v) ** 2
+    b = np.sqrt(abs(a))
+
+    if a > 0:  # band-pass region
+        z = np.sinh(b) / b
+    else:  # cut-off region
+        z = np.sinc(b / np.pi)
+
+    z *= (2 * ${support}) / ${i0_beta}
+    return z

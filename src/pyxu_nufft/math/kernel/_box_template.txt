@@ -1,0 +1,44 @@
+# This is a template file used by `_kernel.py`.
+# Dollar-enclosed variables are replaced at runtime.
+
+import numba as nb
+import numba.types as nbt
+import numpy as np
+
+nb_flags = dict(
+    nopython=True,
+    nogil=True,
+    cache=True,
+    forceobj=False,
+    parallel=False,
+    error_model="numpy",
+    fastmath=True,
+    locals={},
+    boundscheck=False,
+)
+
+
+@nb.jit(
+    [
+        nbt.float32(nbt.float32),
+        nbt.float64(nbt.float64),
+    ],
+    **nb_flags,
+)
+def apply(x):
+    dtype = type(x)
+    y = abs(x) <= ${support}
+    return dtype(y)
+
+
+@nb.jit(
+    [
+        nbt.float32(nbt.float32),
+        nbt.float64(nbt.float64),
+    ],
+    **nb_flags,
+)
+def applyF(v):
+    scale = 2 * ${support}
+    z = scale * np.sinc(scale * v)
+    return z
