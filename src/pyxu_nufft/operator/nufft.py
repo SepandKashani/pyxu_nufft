@@ -1608,3 +1608,123 @@ class NUFFT3(pxa.LinOp):
         x_idx = self._x_idx[a:b]
         out[..., x_idx] = w
         return None
+
+
+class HVOXv1_FINUFFT(NUFFT3):
+    # Compute NUFFT3 using HVOXv1 method, FINUFFT-backed
+
+    def __init__(
+        self,
+        x: pxt.NDArray,
+        v: pxt.NDArray,
+        *,
+        isign: int = isign_default,
+        spp: tuple[int] = spp_default,
+        upsampfac: tuple[float] = upsampfac_default,
+        enable_warnings: bool = enable_warnings_default,
+        fft_kwargs: dict = None,
+        spread_kwargs: dict = None,
+        chunked: bool = False,
+        **kwargs,
+    ):
+        super().__init__(
+            x=x,
+            v=v,
+            isign=isign,
+            spp=spp,
+            upsampfac=upsampfac,
+            enable_warnings=enable_warnings,
+            fft_kwargs=fft_kwargs,
+            spread_kwargs=spread_kwargs,
+            chunked=chunked,
+            **kwargs,
+        )
+
+    def _init_ops(self, fft_kwargs, spread_kwargs):
+        # Sub-tranforms are created at runtime to support batch-dimensions.
+        self._nworkers=spread_kwargs.get("workers")
+
+    def capply(self, arr: pxt.NDArray) -> pxt.NDArray:
+        r"""
+        Parameters
+        ----------
+        arr: NDArray
+            (..., M) weights :math:`\mathbf{w} \in \mathbb{C}^{M}`.
+
+        Returns
+        -------
+        out: NDArray
+            (..., N) weights :math:`\mathbf{z} \in \mathbb{C}^{N}`.
+        """
+        arr = self._cast_warn(arr)
+        xp = pxu.get_array_module(arr)
+
+        c_width = pxrt.CWidth(arr.dtype)
+        c_dtype = c_width.value
+
+        sh = arr.shape[:-1]  # (...,)
+        N_stack = len(sh)
+
+        with cf.ThreadPoolExecutor() as executor:
+            fs = [None] * (self.cfg.Nx_blk * self.cfg.Nv_blk)
+
+            i = 0
+            for nx in range(self.cfg.Nx_blk):
+                for nv in range(self.cfg.Nv_blk):
+                    fs[i] = executor.submit(
+                        self._capply_part,
+                        nx,
+                        nv,
+                        N_stack,
+                        arr,
+                    )
+                    i += 1
+
+        out = xp.zeros((*sh, self.codim_shape[0]), dtype=c_dtype)
+        for future in cf.as_completed(fs):
+            nx, nv, v = future.result()
+
+            c = self._v_info[nv]
+            d = self._v_info[nv + 1]
+            v_idx = self._v_idx[c:d]
+            out[..., v_idx] += v
+        return out
+
+    def _capply_part(
+        self,
+        Nx_idx: int,
+        Nv_idx: int,
+        N_stack: int,
+        arr: np.ndarray,
+    ) -> np.ndarray:
+        from pyxu_finufft.operator import NUFFT3 as FINUFFT3
+
+        # Compute equivalent `eps` based on FINUFFT paper
+        #     eps = 10**(-p)
+        #     p = min(spp) - 1
+        p = min(self.cfg.kernel_spp) - 1.
+        eps = float(10 ** (-p))
+
+        a = self._x_info[Nx_idx]
+        b = self._x_info[Nx_idx + 1]
+        x_idx = self._x_idx[a:b]
+        x = self._x[x_idx] * (2 * np.pi)  # FINUFFT computes /w 2\pi scale.
+
+        c = self._v_info[Nv_idx]
+        d = self._v_info[Nv_idx + 1]
+        v_idx = self._v_idx[c:d]
+        v = self._v[v_idx]
+
+        op = FINUFFT3(
+            x=x,
+            v=v,
+            isign=self.cfg.isign,
+            eps=eps,
+            enable_warnings=False,
+            n_trans=N_stack,
+            nthreads=self._nworkers,
+        )
+
+        w = arr[..., x_idx]
+        v = op.capply(w)
+        return (Nx_idx, Nv_idx, v)
