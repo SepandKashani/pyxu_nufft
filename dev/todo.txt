@@ -2,30 +2,34 @@ doc/
     Add example tutorial notebook.
 
 pyxu.math.cluster
-    Add GPU support.
+    fuse_cluster() takes exceeding amount of time if the number of clusters is large.
+        scratch/test_cluster.py shows this, even if M is tiny.
+            solution: replace inner loop with partial-numba code (since dict[int,set] not accepted)
 
-pyxu.math.kernel
-    Add GPU support.
+            while ...
+                if fuseable_candidates(clusters, cl_LL, cl_UR):
+                    <do i,j merge in Python to circumvent dict[int,set] issue>
+
+                def fuseable_candidate(...) -> bool, (i,j)
+                    equivalent of itertools.combinations() loop
 
 pyxu.operator.UniformSpread
-    Add GPU support
-        Prerequisites
-            pyxu.math.cluster fully GPU-compliant
-        apply
-        adjoint
     Add DASK support
 
 pyxu.operator.linop.fft.nufft
-    Add GPU support
-        Prerequisites
-            pyxu.math.cluster fully GPU compliant
-            pyxu.operator.UniformSpread fully GPU compliant
-        NUFFT3: needs updates below to process CuPy arrays.
-            _partition_domain()
-            _init_metadata()
-    Add DASK support (type-1/2)
+    Add DASK support
+    Move to backward-KB kernel (or poly approximation)
+    Hide NumbaExperimentalWarning
+    NUFFT3
+        _init_ops() creates uniformspread instances, which themselves re-cluster inputs.
+        A large part of _build_cl_info() can be skipped in practice.
+
+        spread/interp, if can be done in a single thread, preferable
 
 Known Issues: Cause Known (& Fixable?)
+    [OK] TestUniformSpread::test_valueND_adjoint
+        Due to a (2,1,3,*codim_shape) broadcasted-view passed in as `arr`, hence `v` is read-only and fails Numba signature test.
+        Does not happen in `test_valueND_apply` because `arr` is indexed with `x_idx` beforehand.
     [OK] DASK-case: Fixture[_op_asarray, width=DOUBLE] does not denote the true ground-truth due to DASK-based FFT()
          error accumulation.  Not really a problem because errors are in 1e-7 range, but did not look into how to fix
          them yet.
