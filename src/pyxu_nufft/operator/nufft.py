@@ -1728,3 +1728,40 @@ class HVOXv1_FINUFFT(NUFFT3):
         w = arr[..., x_idx]
         v = op.capply(w)
         return (Nx_idx, Nv_idx, v)
+
+
+class HVOXv1_NUFFT3(HVOXv1_FINUFFT):
+    # Compute NUFFT3 using HVOXv1 method, NUFFT3-backed
+
+    def _capply_part(
+        self,
+        Nx_idx: int,
+        Nv_idx: int,
+        N_stack: int,
+        arr: np.ndarray,
+    ) -> np.ndarray:
+        a = self._x_info[Nx_idx]
+        b = self._x_info[Nx_idx + 1]
+        x_idx = self._x_idx[a:b]
+        x = self._x[x_idx]
+
+        c = self._v_info[Nv_idx]
+        d = self._v_info[Nv_idx + 1]
+        v_idx = self._v_idx[c:d]
+        v = self._v[v_idx]
+
+        op = NUFFT3(
+            x=x,
+            v=v,
+            isign=self.cfg.isign,
+            spp=self.cfg.kernel_spp,
+            enable_warnings=False,
+            spread_kwargs=dict(
+                workers=self._nworkers,
+            ),
+            chunked=False,
+        )
+
+        w = arr[..., x_idx]
+        v = op.capply(w)
+        return (Nx_idx, Nv_idx, v)
